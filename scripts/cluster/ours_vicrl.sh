@@ -8,6 +8,9 @@
 # expert pile expert_data/hc_liu.pkl is made with scripts/make_hc_liu_expert.py.
 # Submit from ~/scratch/icrl_benchmarking:
 #   mkdir -p logs && sbatch scripts/cluster/ours_vicrl.sh
+# Another config and wandb group (e.g. the 60-round runs):
+#   sbatch --export=ALL,CONFIG=configs/hc/vicrl_60.yaml,GROUP=ours_vicrl_60 \
+#     scripts/cluster/ours_vicrl.sh
 #SBATCH --account=aip-s2ganapa
 #SBATCH --job-name=ours_vicrl
 #SBATCH --array=0-19
@@ -23,9 +26,13 @@ source $HOME/icrl_venv/bin/activate
 export WANDB_MODE=offline WANDB_SILENT=true OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
 
 # Config paths (the expert pile) are relative to the repo root; runs go to
-# runs/hc_vicrl_seed<k>/, wandb's offline files to ./wandb.
+# runs/hc_vicrl_seed<k>/ (hc_vicrl_60_seed<k>/ for vicrl_60.yaml), wandb offline files to ./wandb.
 cd $HOME/scratch/icrl_benchmarking
 
-python scripts/run_icrl.py --config configs/hc/vicrl.yaml \
+# The 30-round config and its group unless given at submission.
+CONFIG=${CONFIG:-configs/hc/vicrl.yaml}
+GROUP=${GROUP:-ours_vicrl}
+
+python scripts/run_icrl.py --config $CONFIG \
     --seed $SLURM_ARRAY_TASK_ID \
-    --wandb-project icrl-hc-icrl --wandb-group ours_vicrl
+    --wandb-project icrl-hc-icrl --wandb-group $GROUP
