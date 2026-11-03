@@ -30,6 +30,10 @@ class VICRLSettings:
     # Feature columns the network sees, in order; None = all (Liu's code
     # has no column bug, docs/methods.md §4).
     input_columns: tuple[int, ...] | None = None
+    # Seed for the network's starting weights only; None = the run's seed.
+    # Liu's train_icrl.py starts every run from torch seed 0's network, bug
+    # (6) (docs/methods.md); set 0 to reproduce it.
+    init_seed: int | None = None
     seed: int = 0
     device: str = "cpu"
 
@@ -57,18 +61,31 @@ class VICRL:
         s = self.settings
         assert s.mode in ("sample", "mean"), s.mode
         torch.manual_seed(s.seed)
-        # VariationalConstraintNet._build: SB3 create_mlp (Linear + ReLU per
-        # hidden layer, PyTorch default init) with 2 outputs, then softplus.
+        if s.init_seed is None:
+            self.net = self._build_net(n_features)
+        else:
+            # fork_rng saves torch's random state and restores it on exit, so
+            # the run's own stream (Beta draws, the agent's sampling) still
+            # follows the run seed, as in Liu's code, where the agent reseeds
+            # torch right after his network is built.
+            with torch.random.fork_rng():
+                torch.manual_seed(s.init_seed)
+                self.net = self._build_net(n_features)
+        # eps=1e-5 avoids NaNs in Adam (ConstraintNet.__init__).
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=s.learning_rate, eps=1e-5)
+        self.n_updates = 0  # the k-th update is ICRL round k
+
+    def _build_net(self, n_features):
+        """VariationalConstraintNet._build: SB3 create_mlp (Linear + ReLU per
+        hidden layer, PyTorch default init) with 2 outputs, then softplus."""
+        s = self.settings
         in_dim = n_features if s.input_columns is None else len(s.input_columns)
         layers = []
         for size in s.hidden_sizes:
             layers += [nn.Linear(in_dim, size), nn.ReLU()]
             in_dim = size
         layers += [nn.Linear(in_dim, 2), nn.Softplus()]
-        self.net = nn.Sequential(*layers).to(s.device)
-        # eps=1e-5 avoids NaNs in Adam (ConstraintNet.__init__).
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=s.learning_rate, eps=1e-5)
-        self.n_updates = 0  # the k-th update is ICRL round k
+        return nn.Sequential(*layers).to(s.device)
 
     def _inputs(self, features):
         """Network input: a (steps, features) array as a float tensor,
