@@ -1,5 +1,5 @@
 """Featurizers for HalfCheetahWithPos, one per network input of Malik's
-(commit f28214e):
+(commit f28214e), and one for Gaurav's ICL (commit 096e422):
 - featurize: the clipped observation and the clipped action, as his
   ConstraintNet.prepare_data builds them (icrl/constraint_net.py) with his
   HCWithPos settings (no normalisation, --clip_obs 20). Maximum Entropy,
@@ -7,6 +7,9 @@
 - featurize_raw: the same columns unclipped, as his GailDiscriminator builds
   them (icrl/gail_utils.py: its normalize_obs body and clip_actions call are
   commented out). GACL (docs/decisions.md, 2026-11-01).
+- featurize_x: the x-position only, unclipped, as Gaurav's ICL cost and flow
+  see it on HalfCheetah (configs/hc.json: state_reduction s[:1], input
+  format [*s], i = 1). ICL.
 His networks then keep only some of these columns, by a bug; that is a
 method setting (input_columns), not the featurizer's job."""
 
@@ -39,3 +42,10 @@ def featurize_raw(trajectory):
     On Malik's expert pile x reaches ~138, so clipping would matter."""
     obs, actions = _obs_and_actions(trajectory)
     return np.concatenate([obs, actions], axis=1).astype(np.float32)
+
+
+def featurize_x(trajectory):
+    """One row per step: the x-position (obs[0]) alone, as given. 1 column.
+    Gaurav's flow rescales its inputs itself (normalize_flow_inputs)."""
+    obs, _ = _obs_and_actions(trajectory)
+    return obs[:, :1].astype(np.float32)

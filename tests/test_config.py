@@ -91,3 +91,45 @@ def test_a_named_loop_gets_its_own_settings_and_is_saved_by_name(tmp_path):
     save_config(config, tmp_path / "saved.yaml")
     assert yaml.safe_load((tmp_path / "saved.yaml").read_text())["loop"]["name"] == "gacl"
     assert load_config(tmp_path / "saved.yaml") == config
+
+
+def hc_icl(**changes):
+    """An ICL HalfCheetah config as a dict (only what the checks need)."""
+    return raw(**{"nominal_env": {"name": "half_cheetah_with_pos"},
+                  "eval_env": {"name": "half_cheetah_with_pos"},
+                  "true_cost": {"name": "half_cheetah_with_pos", "wall_x": -1},
+                  "featurizer": {"name": "half_cheetah_with_pos_x"},
+                  "method": {"name": "icl"}, "loop": {"name": "icl"},
+                  "metrics_grid": {"name": "half_cheetah_with_pos"}, **changes})
+
+
+def test_a_metrics_grid_is_read_saved_and_read_back(tmp_path):
+    config = parse_config(hc_icl())
+    assert config.metrics_grid == Named("half_cheetah_with_pos", {})
+    save_config(config, tmp_path / "saved.yaml")
+    assert yaml.safe_load((tmp_path / "saved.yaml").read_text())["metrics_grid"] == {
+        "name": "half_cheetah_with_pos"}
+    assert load_config(tmp_path / "saved.yaml") == config
+
+
+def test_no_metrics_grid_stays_absent(tmp_path):
+    config = parse_config(raw())
+    assert config.metrics_grid is None
+    save_config(config, tmp_path / "saved.yaml")
+    assert "metrics_grid" not in yaml.safe_load((tmp_path / "saved.yaml").read_text())
+
+
+@pytest.mark.parametrize("changes, message", [
+    (dict(loop={"name": "icrl"}, method={"name": "maximum_entropy"}), "does not log ICL metrics"),
+    (dict(metrics_grid={"name": "half_cheetah_with_pos", "x": 1}), "takes no arguments"),
+    (dict(metrics_grid={"name": "nope"}), "is not one of"),
+])
+def test_metrics_grid_mistakes_are_refused(changes, message):
+    with pytest.raises(ValueError, match=message):
+        parse_config(hc_icl(**changes))
+
+
+def test_a_metrics_grid_on_the_wrong_env_is_refused():
+    with pytest.raises(ValueError, match="does not apply"):
+        parse_config(raw(method={"name": "icl"}, loop={"name": "icl"},
+                         metrics_grid={"name": "half_cheetah_with_pos"}))

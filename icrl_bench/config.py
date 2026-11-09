@@ -4,13 +4,16 @@ script's job."""
 
 from dataclasses import asdict, dataclass, fields, is_dataclass
 
+import inspect
+
 import yaml
 
-from icrl_bench.registry import (AGENTS, ENVS, FEATURIZERS, LOOPS, METHODS, TRUE_COSTS, check_method_fits_loop,
-                                 check_true_cost_fits)
+from icrl_bench.registry import (AGENTS, ENVS, FEATURIZERS, LOOPS, METHODS, METRIC_GRIDS, TRUE_COSTS,
+                                 check_method_fits_loop, check_metric_grid_fits, check_true_cost_fits)
 
 KEYS = {"nominal_env", "eval_env", "true_cost", "featurizer", "expert", "n_envs",
         "agent", "method", "loop", "seed"}
+OPTIONAL_KEYS = {"metrics_grid"}  # ICL's CMSE / NAD grid (docs/decisions.md 2026-11-08)
 
 
 @dataclass(frozen=True)
@@ -33,6 +36,7 @@ class Config:
     method: Named
     loop: Named  # name defaults to "icrl" (docs/decisions.md, 2026-11-01)
     seed: int
+    metrics_grid: Named | None = None  # only loops taking metric_grid (run_icl)
 
 
 def load_config(path, seed=None):
@@ -47,8 +51,9 @@ def load_config(path, seed=None):
 
 def parse_config(raw):
     """raw: the dict read from YAML. Raises ValueError on any mistake."""
-    if set(raw) != KEYS:
-        raise ValueError(f"config keys: missing {sorted(KEYS - set(raw))}, unknown {sorted(set(raw) - KEYS)}")
+    missing, unknown = KEYS - set(raw), set(raw) - KEYS - OPTIONAL_KEYS
+    if missing or unknown:
+        raise ValueError(f"config keys: missing {sorted(missing)}, unknown {sorted(unknown)}")
     seed = raw["seed"]
     config = Config(
         nominal_env=_named(raw["nominal_env"], ENVS, "nominal_env"),
@@ -61,12 +66,22 @@ def parse_config(raw):
         method=_named(raw["method"], METHODS, "method", seed),
         loop=_named({"name": "icrl", **raw["loop"]}, LOOPS, "loop", seed),
         seed=seed,
+        metrics_grid=(_named(raw["metrics_grid"], METRIC_GRIDS, "metrics_grid")
+                      if "metrics_grid" in raw else None),
     )
     if config.featurizer.args:
         raise ValueError("featurizer: plain-function featurizers take no arguments")
     for env in (config.nominal_env, config.eval_env):
         check_true_cost_fits(config.true_cost.name, env.name)
     check_method_fits_loop(config.loop.name, config.method.name)
+    if config.metrics_grid is not None:
+        if config.metrics_grid.args:
+            raise ValueError("metrics_grid: a grid takes no arguments")
+        loop_fn = LOOPS[config.loop.name][0]
+        if "metric_grid" not in inspect.signature(loop_fn).parameters:
+            raise ValueError(f"metrics_grid: loop {config.loop.name!r} does not log ICL metrics")
+        for env in (config.nominal_env, config.eval_env):
+            check_metric_grid_fits(config.metrics_grid.name, env.name)
     return config
 
 
@@ -81,6 +96,10 @@ def save_config(config, path):
     raw = {f.name: getattr(config, f.name) for f in fields(config)}  # Config's order
     for key in ("nominal_env", "eval_env", "true_cost", "featurizer", "agent", "method", "loop"):
         raw[key] = {"name": raw[key].name, **block(raw[key].args)}
+    if raw["metrics_grid"] is None:
+        del raw["metrics_grid"]  # optional: absent, not null
+    else:
+        raw["metrics_grid"] = {"name": raw["metrics_grid"].name}
     with open(path, "w") as f:
         yaml.safe_dump(raw, f, sort_keys=False)
 

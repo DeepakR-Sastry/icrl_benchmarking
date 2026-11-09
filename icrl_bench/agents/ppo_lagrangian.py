@@ -448,7 +448,6 @@ class PPOLagrangian:
         self.lagrange = LagrangeMultiplier(s.penalty_initial_value, s.penalty_learning_rate, s.budget)
         self.normalizer = Normalizer(observation_space.shape, s.normalize_obs, s.normalize_reward,
                                      s.normalize_cost, s.reward_gamma, s.cost_gamma)
-        self.envs_seeded = False
 
     def train(self, envs, total_steps, callback=None):
         """Alternate collecting a rollout, updating the networks with the
@@ -459,13 +458,17 @@ class PPOLagrangian:
         and CostWrapper.
 
         Resets envs on every call, as Malik's ICRL loop does (learn's default
-        reset_num_timesteps=True); the seed is used on the first call only.
+        reset_num_timesteps=True); the envs are seeded on their first reset only.
         λ carries over between calls. Returns one dict per rollout;
         callback, if given, is also called with each dict as soon as its
         rollout is done (SB3's callbacks; lets long runs save as they go)."""
         s = self.settings
-        obs, _ = envs.reset(seed=None if self.envs_seeded else s.seed)
-        self.envs_seeded = True
+        # The envs remember whether they were seeded, not the agent: a new
+        # agent on the same envs (ICL's fresh agent each round) continues
+        # their random streams (docs/decisions.md 2026-11-04).
+        seeded = getattr(envs, "seeded", False)
+        obs, _ = envs.reset(seed=None if seeded else s.seed)
+        envs.seeded = True
         # The statistics carry over between calls, like λ. Reset observations
         # are rescaled but not added to them (Malik's VecNormalize.reset).
         self.normalizer.reset(envs.num_envs)

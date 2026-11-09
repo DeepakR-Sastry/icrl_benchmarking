@@ -21,3 +21,17 @@ class Trajectory:
     nominal) it sits in is its label."""
 
     steps: list[Step]
+
+
+@dataclass(frozen=True)
+class MetricGrid:
+    """Where an env's ICL metrics (Gaurav's CMSE and NAD,
+    eval/icl_metrics.py) are measured: a list of points along one
+    coordinate of the state. The env file that knows that coordinate
+    builds it; the metrics and the loop only read it."""
+
+    values: Any  # np.ndarray (n,): the grid points
+    trajectory: Trajectory  # one Step per grid point: that coordinate set, all else 0
+    coordinate: Any  # coordinate(obs) -> float: the number a step is binned on
+    left_gap: float  # accrual window: [value - left_gap, value + right_gap]
+    right_gap: float

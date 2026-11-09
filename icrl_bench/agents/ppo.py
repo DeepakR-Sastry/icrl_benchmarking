@@ -367,7 +367,6 @@ class PPO:
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.settings.learning_rate, eps=1e-5)
         self.normalizer = Normalizer(observation_space.shape, self.settings.normalize_obs,
                                      self.settings.normalize_reward, self.settings.gamma)
-        self.envs_seeded = False
 
     def train(self, envs, total_steps, callback=None, reward_hook=None):
         """Alternate collecting a rollout and updating, until at least
@@ -382,13 +381,17 @@ class PPO:
         Logged ep_rew_mean stays the env's own reward.
 
         Resets envs on every call, as Malik's ICRL loop does (learn's default
-        reset_num_timesteps=True); the seed is used on the first call only.
+        reset_num_timesteps=True); the envs are seeded on their first reset only.
         Returns one dict per rollout for logging; callback, if given, is
         also called with each dict as soon as its rollout's update is done
         (as PPOLagrangian.train's)."""
         s = self.settings
-        obs, _ = envs.reset(seed=None if self.envs_seeded else s.seed)
-        self.envs_seeded = True
+        # The envs remember whether they were seeded, not the agent: a new
+        # agent on the same envs (ICL's fresh agent each round) continues
+        # their random streams (docs/decisions.md 2026-11-04).
+        seeded = getattr(envs, "seeded", False)
+        obs, _ = envs.reset(seed=None if seeded else s.seed)
+        envs.seeded = True
         # The statistics carry over between calls. Reset observations are
         # rescaled but not added to them (Malik's VecNormalize.reset).
         self.normalizer.reset(envs.num_envs)

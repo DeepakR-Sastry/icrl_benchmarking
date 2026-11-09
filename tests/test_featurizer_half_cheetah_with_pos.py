@@ -1,7 +1,7 @@
 import numpy as np
 
 from icrl_bench.core.types import Step, Trajectory
-from icrl_bench.featurizers.half_cheetah_with_pos import featurize, featurize_raw
+from icrl_bench.featurizers.half_cheetah_with_pos import featurize, featurize_raw, featurize_x
 
 
 def test_rows_are_clipped_obs_then_clipped_action():
@@ -35,3 +35,15 @@ def test_raw_rows_are_obs_then_action_unclipped():
     # Same columns as the clipped featurizer where nothing is out of range.
     small = Trajectory([Step(np.full(18, 0.1), np.zeros(6), 0.0)])
     np.testing.assert_array_equal(featurize_raw(small), featurize(small))
+
+
+def test_x_rows_are_the_x_position_alone_unclipped():
+    states = [np.zeros(18) for _ in range(3)]
+    for obs, x in zip(states, (0.1, -1.2, 103.0)):
+        obs[0], obs[1] = x, 7.0  # obs[1] must not appear
+    trajectory = Trajectory([Step(obs, np.full(6, 2.0), 0.0) for obs in states])
+
+    features = featurize_x(trajectory)
+
+    assert features.shape == (3, 1) and features.dtype == np.float32
+    np.testing.assert_array_equal(features[:, 0], np.float32([0.1, -1.2, 103.0]))  # 103 not clipped

@@ -36,5 +36,9 @@ def test_every_method_runs_in_exactly_one_loop():
 def test_a_method_in_the_wrong_loop_is_refused():
     check_method_fits_loop("gacl", "gacl")
     check_method_fits_loop("icrl", "binary_classifier")
+    check_method_fits_loop("icl", "icl")
     with pytest.raises(ValueError, match="does not run in loop"):
         check_method_fits_loop("icrl", "gacl")
+    # run_icrl would run ICL without its flow or snapshots.
+    with pytest.raises(ValueError, match="does not run in loop"):
+        check_method_fits_loop("icrl", "icl")

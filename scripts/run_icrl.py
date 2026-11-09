@@ -92,8 +92,11 @@ def main():
     # Last evaluated row (GACL's last row has no evaluation).
     evaluated = [row for row in log if not math.isnan(row["true/reward"])]
     reward = f"{evaluated[-1]['true/reward']:.2f}" if evaluated else "none"
+    # true/cost: run_icrl / run_gacl rows; ICL rows have true/violating_episodes.
+    cost = (f"true cost per step {last['true/cost']:.3f}" if "true/cost" in last
+            else f"violating episodes {last['true/violating_episodes']:.2f}")
     print(f"runs/{name}: {len(log)} rows, {last['timesteps']} steps, "
-          f"last reward {reward}, true cost per step {last['true/cost']:.3f}")
+          f"last reward {reward}, {cost}")
 
 
 if __name__ == "__main__":
