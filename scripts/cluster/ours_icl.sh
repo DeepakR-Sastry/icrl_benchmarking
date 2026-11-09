@@ -5,9 +5,10 @@
 # Seeds 1-20: his hc.json seed is 1, and both local seed-1 runs used it
 # (docs/results.md, step 17); his job uses 1-20 too.
 # Local run: ~1.3 h on one thread (docs/context.md); 8 h leaves room for a
-# slow node. compute2 is excluded: ~4x slower (VICRL seed 0; the first ICL
-# test job 2220924 there had no round done after 30 min, docs/decisions.md
-# 2026-11-09). 6G: his run peaked at 4.3 GB; ours was not measured.
+# slow node. compute1 and compute2 are excluded: compute2 ~4x slower
+# (VICRL job 2104820; ICL test job 2220924 had no round done after 30 min),
+# compute1 > 1.6x (test job 2221219: no round after 27 min; local 17 min);
+# docs/decisions.md 2026-11-09. 6G: his run peaked at 4.3 GB; ours was not measured.
 # Setup (venv + POT, clone, expert pile): docs/decisions.md, 2026-10-28 and
 # 2026-11-09; the pile expert_data/hc_gaurav.pkl is made with
 # scripts/make_hc_gaurav_expert.py and copied over with scp.
@@ -19,7 +20,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=6G
 #SBATCH --time=8:00:00
-#SBATCH --exclude=compute2
+#SBATCH --exclude=compute[1-2]
 #SBATCH --output=logs/%x_%A_%a.out
 
 # Modules first, then the venv: loading modules resets some variables.
