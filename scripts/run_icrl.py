@@ -51,10 +51,13 @@ MALIK_GAIL_NAMES = {
 
 # Loop name -> (his names, the column that is his wandb step). icrl.py logs
 # once per round with step = round; gail.py's logger uses step =
-# num_timesteps.
+# num_timesteps. ICL: Gaurav's icl.py logs to tensorboard, not wandb, so
+# ours keep our names and scripts/upload_gaurav_logs.py renames his to
+# ours (as upload_liu_logs.py); step = round (the final round's is n_rounds).
 WANDB = {
     "icrl": (MALIK_ICRL_NAMES, "round"),
     "gacl": (MALIK_GAIL_NAMES, "timesteps"),
+    "icl": ({}, "round"),
 }
 
 
