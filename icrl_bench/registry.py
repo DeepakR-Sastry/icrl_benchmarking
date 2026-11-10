@@ -3,6 +3,7 @@
 
 from icrl_bench.agents.ppo import PPO, PPOSettings
 from icrl_bench.agents.ppo_lagrangian import PPOLagrangian, PPOLagrangianSettings
+from icrl_bench.agents.ppo_lagrangian_ray import PPOLagrangianRay, PPOLagrangianRaySettings
 from icrl_bench.core.loop import (GACLLoopSettings, ICLLoopSettings, ICRLLoopSettings, run_gacl,
                                   run_icl, run_icrl)
 from icrl_bench.envs import half_cheetah_with_pos, lap_grid_world
@@ -49,6 +50,7 @@ METRIC_GRIDS = {
 AGENTS = {
     "ppo": (PPO, PPOSettings),
     "ppo_lagrangian": (PPOLagrangian, PPOLagrangianSettings),
+    "ppo_lagrangian_ray": (PPOLagrangianRay, PPOLagrangianRaySettings),
 }
 
 METHODS = {

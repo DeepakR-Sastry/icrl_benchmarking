@@ -19,9 +19,14 @@ def test_an_unlisted_pairing_is_refused():
 
 
 def test_every_agent_and_method_builds_from_its_default_settings():
-    env = ENVS["lap_grid_world"]()
-    for cls, settings_cls in AGENTS.values():
-        cls(env.observation_space, env.action_space, settings_cls())
+    discrete, continuous = ENVS["lap_grid_world"](), ENVS["half_cheetah_with_pos"]()
+    for name, (cls, settings_cls) in AGENTS.items():
+        cls(continuous.observation_space, continuous.action_space, settings_cls())
+        if name == "ppo_lagrangian_ray":  # his PPOLag envs are all continuous
+            with pytest.raises(ValueError, match="Box"):
+                cls(discrete.observation_space, discrete.action_space, settings_cls())
+        else:
+            cls(discrete.observation_space, discrete.action_space, settings_cls())
     for cls, settings_cls in METHODS.values():
         cls(3, settings_cls())
 
