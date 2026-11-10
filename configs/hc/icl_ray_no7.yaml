@@ -1,0 +1,46 @@
+# ICL on HalfCheetah-Constrained, his agent, bug (7) OFF: configs/hc/icl_ray.yaml
+# with only agent_data changed (snapshots: the backward step's episodes are
+# played by the trained agent's snapshots, as the paper describes). Bugs (8)
+# and (9) stay on. One of the bug-off runs (docs/decisions.md 2026-11-10).
+nominal_env: {name: half_cheetah_with_pos}     # env_id HCWithPos-v0, time_limit 1000
+eval_env: {name: half_cheetah_with_pos}
+true_cost: {name: half_cheetah_with_pos, wall_x: -1}   # cost_condition s[0] <= -1
+featurizer: {name: half_cheetah_with_pos_x}    # state_reduction s[:1], i = 1, unclipped
+expert: expert_data/hc_gaurav.pkl              # expert_episodes 100
+n_envs: 1                                      # his PPOLag runs one env (1 MPI process)
+agent:
+  name: ppo_lagrangian_ray
+  # Unset = his PPOLag's own defaults (PPOLagrangianRaySettings), which
+  # hc.json leaves unset too: pi_lr 5e-4, pi_iters 80, kl_margin 1.2,
+  # target_kl 0.01, vf_lr 1e-3, vf_iters 80, penalty init 1, penalty lr 0.05.
+  n_steps: 4000                                # steps_per_epoch
+  gamma: 0.99                                  # discount_factor
+  lam: 0.97                                    # gae_lambda
+  clip_ratio: 0.2                              # ppo_clip_param
+  ent_coef: 0.0                                # ppo_entropy_coef
+  budget: 15.0                                 # beta (per episode)
+  lambda_reads_reward: true                    # his bug (8)
+  logp_from_other_draw: true                   # his bug (9)
+method:
+  name: icl
+  hidden: 64                                   # icl.py h=64 (hidden_size 64)
+  learning_rate: 5.0e-4                        # learning_rate
+  discount: 0.99                               # discount_factor
+  beta: 15.0                                   # beta
+  alpha: 15.0                                  # alpha
+  updates_per_epoch: 25                        # updates_per_epoch (inner steps, quirk (b))
+  flow_epochs: 20                              # flow_epochs
+  flow_batch_size: 64                          # minibatch_size
+  normalize_flow_inputs: true                  # normalize_flow_inputs
+loop:
+  name: icl
+  n_rounds: 5                                  # outer_epochs
+  steps_per_round: 200000                      # ppo_epochs 50 x steps_per_epoch 4000
+  snapshot_every: 50                           # mix_save_epoch 50: one snapshot, at the round's end
+  updates_per_round: 25                        # updates_per_epoch (outer count, quirk (b))
+  pi_episodes: 100                             # pi_episodes
+  final_round: true                            # icl.py L95-102
+  agent_data: snapshots                        # bug (7) OFF (paper's algorithm)
+  n_eval_episodes: 10
+metrics_grid: {name: half_cheetah_with_pos}    # CMSE + NAD on his grid
+seed: 1                                        # his hc.json seed; -seed overrides
