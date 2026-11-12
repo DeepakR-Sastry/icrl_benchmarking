@@ -26,6 +26,10 @@ class BinaryClassifierSettings:
     # sees (0, 0, 1) on LapGridWorld, by a bug (docs/methods.md, "Bugs in
     # the official code" (2)); set it only to match his code.
     input_columns: tuple[int, ...] | None = None
+    # Seed for the network's starting weights only; None = the run's seed.
+    # Liu's train_icrl.py starts every run from torch seed 0's network, bug
+    # (6) (docs/methods.md); set 0 to reproduce it.
+    init_seed: int | None = None
     seed: int = 0
     device: str = "cpu"
 
@@ -40,18 +44,29 @@ class BinaryClassifier:
         s = self.settings
         # Malik never seeds this network; we do, so runs are reproducible.
         torch.manual_seed(s.seed)
-        # ConstraintNet._build: SB3 create_mlp (Linear + ReLU per hidden
-        # layer, PyTorch default init) then a sigmoid.
+        if s.init_seed is None:
+            self.net = self._build_net(n_features)
+        else:
+            # fork_rng saves torch's random state and restores it on exit, so
+            # the run's own stream still follows the run seed (as VICRL).
+            with torch.random.fork_rng():
+                torch.manual_seed(s.init_seed)
+                self.net = self._build_net(n_features)
+        # eps=1e-5 avoids NaNs in Adam (ConstraintNet.__init__).
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=s.learning_rate, eps=1e-5)
+        self.n_updates = 0  # the k-th update is ICRL round k
+
+    def _build_net(self, n_features):
+        """ConstraintNet._build: SB3 create_mlp (Linear + ReLU per hidden
+        layer, PyTorch default init) then a sigmoid."""
+        s = self.settings
         in_dim = n_features if s.input_columns is None else len(s.input_columns)
         layers = []
         for size in s.hidden_sizes:
             layers += [nn.Linear(in_dim, size), nn.ReLU()]
             in_dim = size
         layers += [nn.Linear(in_dim, 1), nn.Sigmoid()]
-        self.net = nn.Sequential(*layers).to(s.device)
-        # eps=1e-5 avoids NaNs in Adam (ConstraintNet.__init__).
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=s.learning_rate, eps=1e-5)
-        self.n_updates = 0  # the k-th update is ICRL round k
+        return nn.Sequential(*layers).to(s.device)
 
     def _inputs(self, features):
         """Network input: a (steps, features) array as a float tensor,

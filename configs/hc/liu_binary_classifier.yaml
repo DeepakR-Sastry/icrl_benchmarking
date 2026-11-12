@@ -1,0 +1,49 @@
+# Binary Classifier (his "BC2L") on HCWithPos as Liu et al. run it: his
+# config config/mujuco_BlockedHalfCheetah/train_Binary_HCWithPos-v0.yaml
+# (commit 0d79d2c), run as his tutorial: train_icrl.py <config> -n 5 -s <seed>
+# (step 13, docs/decisions.md 2026-11-12). Everything outside `method` and
+# `loop` is configs/hc/vicrl.yaml's (as liu_maximum_entropy.yaml): his BC
+# config differs from his VICRL one only in the CN block, use_buffer and the
+# PPO-block clip_obs (read nowhere). Unset = our defaults.
+# Lines of his with no setting here: PPO.clip_obs (absent, unused), the PID
+# coefficients (ignored: algo_type 'lagrangian'), cn_reg_coeff 0.5 and
+# cn_target_kl_* (his ConstraintNet.train_nn BC branch sets the regulariser
+# to 0 and, with no_importance_sampling, never checks the KL: = ours),
+# per_step_importance_sampling (unused without importance sampling),
+# cn_batch_size null (full batch = ours), cn_normalize False, clip_obs 20
+# (= the featurizer below).
+nominal_env: {name: half_cheetah_with_pos}          # train_env_id HCWithPos-v0
+# His evaluation runs in the sampling env = the *unconstrained* HCWithPos
+# (eval_env_id is only passed to his sampler), 10 episodes; we log his
+# feasible reward next to the total (docs/decisions.md, 2026-11-01).
+eval_env: {name: half_cheetah_with_pos}
+true_cost: {name: half_cheetah_with_pos}             # ours x <= -3; his x < -3 (docs/envs.md)
+# His network clips observations to +-20 and actions to their bounds
+# (ConstraintNet.prepare_data, clip_obs 20) = this featurizer.
+featurizer: {name: half_cheetah_with_pos}
+# His expert pile, read as his code reads it — bug (5) reproduced on
+# purpose (docs/methods.md); made by scripts/make_hc_liu_expert.py.
+expert: expert_data/hc_liu.pkl                       # expert_rollouts: 10
+n_envs: 5                                            # -n 5
+agent:
+  name: ppo_lagrangian
+  target_kl: 0.01                                    # PPO.target_kl
+  # dont_normalize_obs / _reward / _cost: False -> all three on.
+  normalize_obs: true
+  normalize_reward: true
+  normalize_cost: true
+method:
+  name: binary_classifier                            # train_gail_lambda: True (BCE loss)
+  hidden_sizes: [30]                                 # cn_layers
+  learning_rate: 0.05                                # cn_learning_rate
+  anneal_lr_by_factor: 0.9                           # anneal_clr_by_factor
+  backward_iters: 10                                 # backward_iters (no_importance_sampling: no early stop)
+  eps: 1.0e-5                                        # cn_eps
+  # input_columns unset: all 24 columns (his code has no bug (2)).
+  init_seed: 0                                       # his bug (6): every run from seed 0's network
+loop:
+  n_rounds: 30                                       # n_iters
+  steps_per_round: 200000                            # forward_timesteps
+  n_eval_episodes: 10                                # n_eval_episodes
+  nominal_buffer: false                              # use_buffer: False
+seed: 0

@@ -80,3 +80,23 @@ def test_input_columns_choose_what_the_network_sees():
     # The backward row differs from the forward one only in the dropped
     # column and in is_forward, so the selection keeps the information.
     assert m.cost(rows)[0] != m.cost(rows)[1]
+
+
+def test_init_seed_fixes_only_the_starting_network():
+    # Liu's bug (6) on his ME path (same train_icrl.py as VICRL): every run
+    # starts from torch seed 0's network; the rest follows its own seed.
+    def build(seed, init_seed):
+        method = MaximumEntropy(3, MaximumEntropySettings(hidden_sizes=(8,), seed=seed, init_seed=init_seed))
+        weights = [p.detach().clone() for p in method.net.parameters()]
+        return weights, torch.rand(3)   # the run's stream right after construction
+
+    w_plain0, _ = build(seed=0, init_seed=None)
+    w3, draw3 = build(seed=3, init_seed=0)
+    w7, draw7 = build(seed=7, init_seed=0)
+    for a, b, c in zip(w_plain0, w3, w7):
+        assert torch.equal(a, b) and torch.equal(a, c)   # seed 0's network, whatever the run seed
+    assert not torch.equal(draw3, draw7)                  # the run's own draws still differ
+    torch.manual_seed(3)
+    assert torch.equal(draw3, torch.rand(3))              # = run seed 3's fresh stream
+    w_plain3, _ = build(seed=3, init_seed=None)
+    assert not torch.equal(w_plain3[0], w_plain0[0])      # unset: follows the run seed

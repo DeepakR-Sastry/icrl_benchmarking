@@ -1,13 +1,18 @@
-"""Upload Liu's VICRL runs to wandb from their Slurm logs, to chart them next
-to ours (group ours_vicrl). His code doesn't log to wandb on this path; it
-prints one table per round (his SB3 logger's text output) to stdout.
+"""Upload Liu's runs (any of his ICRL-loop methods) to wandb from their
+Slurm logs, to chart them next to ours. His code doesn't log to wandb on
+this path; it prints one table per round (his SB3 logger's text output) to
+stdout.
 
-    python scripts/upload_liu_logs.py logs/liu_vicrl_2101234_*.out \
-        --project icrl-hc-icrl --group liu_vicrl
+    python scripts/upload_liu_logs.py logs/liu_me_2301234_*.out \
+        --project icrl-hc-icrl --config liu_maximum_entropy
 
-One wandb run per log, named liu_vicrl_seed<k> (k from the file name
-..._<k>.out, the Slurm array index = his -s seed), one point per round with
-step = run_iter, as ours (step = round).
+--config names OUR config for the same setup (configs/hc/<name>.yaml); its
+method is recorded. Group liu__<name>, run liu__<name>__seed<k> (k from the
+file name ..._<k>.out, the Slurm array index = his -s seed), as our
+run_icrl.py names ours ours__<name> (docs/decisions.md 2026-11-12). Fields:
+code liu, config_file, method, git_commit (his commit), source_log,
+his_config (the "config: ..." line his job script prints first). One point
+per round, step = run_iter, as ours (step = round).
 
 Limits of his text output: values are rounded to 3 significant figures, and
 names longer than the column are cut ("unweighted_nomina..."): those are
@@ -16,6 +21,10 @@ skipped. Non-numbers (backward/data_shape "[10000, 24]") are skipped too.
 import argparse
 import re
 from pathlib import Path
+
+import yaml
+
+HIS_COMMIT = "0d79d2c"  # ~/refs/liu_icrl, the clone his runs use (Vulcan too)
 
 # His name -> ours, where both mean the same thing (docs/methods.md §4).
 # Everything else keeps his name: backward/* already equals ours (vicrl.py
@@ -68,18 +77,27 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("logs", nargs="+")
     parser.add_argument("--project", required=True)
-    parser.add_argument("--group", required=True)
+    parser.add_argument("--config", required=True, help="our config for this setup, configs/hc/<name>.yaml")
     parser.add_argument("--entity", default="irl-chip")
     args = parser.parse_args()
+
+    config_file = Path("configs/hc") / f"{args.config}.yaml"
+    method = yaml.safe_load(config_file.read_text())["method"]["name"]  # refuses a missing file
+    group = f"liu__{args.config}"
 
     import wandb
 
     for path in map(Path, args.logs):
         seed = int(path.stem.rsplit("_", 1)[1])
-        rows = parse_tables(path.read_text(errors="replace"))
+        text = path.read_text(errors="replace")
+        rows = parse_tables(text)
+        his_config = re.search(r"^config: (\S+)", text, re.MULTILINE)
         run = wandb.init(entity=args.entity, project=args.project,
-                         group=args.group, name=f"{args.group}_seed{seed}",
-                         config={"seed": seed, "source_log": path.name})
+                         group=group, name=f"{group}__seed{seed}",
+                         config={"seed": seed, "source_log": path.name, "code": "liu",
+                                 "config_file": str(config_file), "method": method,
+                                 "git_commit": HIS_COMMIT,
+                                 "his_config": his_config.group(1) if his_config else "unknown"})
         for row in rows:
             renamed = {OUR_NAMES.get(k, k): v for k, v in row.items()}
             wandb.log(renamed, step=int(row["run_iter"]))

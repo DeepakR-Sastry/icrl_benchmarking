@@ -99,6 +99,10 @@ def test_rollout_shapes_and_episode_boundary():
 
 
 def test_next_rollout_continues_where_the_last_stopped():
+    # Seeded: unseeded, a 10-step random walk sometimes comes back to its
+    # start cell, and the last check failed at random (found 2026-11-12;
+    # seeds 0 and 3 return, 5 forward + 5 back). Seed 1 ends elsewhere.
+    torch.manual_seed(1)
     envs, obs = lgw_envs(2)
     net = ActorCritic(envs.single_observation_space, envs.single_action_space)
     first, obs, starts = collect_rollout(net, off(envs), envs, obs, np.zeros(2, np.float32), 10, 0.99, 0.95)

@@ -8,10 +8,14 @@ Run from the repo root (paths inside configs are relative to it):
                            e.g. hc_maximum_entropy_seed0 (configs/lgw and configs/hc
                            share file names, so the folder keeps runs apart)
       [--wandb-project P]  also log every row to wandb, under the names
-      [--wandb-group G]    Malik's code logs them (default group "ours")"""
+                           Malik's code logs them
+      [--wandb-group G]    default ours__<config file name>; the run is
+                           <group>__seed<seed>, with fields code, config_file,
+                           method, git_commit (docs/decisions.md 2026-11-12)"""
 
 import argparse
 import math
+import subprocess
 from dataclasses import asdict
 from pathlib import Path
 
@@ -61,13 +65,26 @@ WANDB = {
 }
 
 
+
+def git_commit():
+    """The repo's commit, "-dirty" if files differ from it; "unknown"
+    outside a git checkout."""
+    try:
+        commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True,
+                                text=True, check=True).stdout.strip()
+        dirty = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"],
+                               capture_output=True, text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return commit + ("-dirty" if dirty else "")
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--name")
     parser.add_argument("--wandb-project")
-    parser.add_argument("--wandb-group", default="ours")
+    parser.add_argument("--wandb-group")
     args = parser.parse_args()
 
     config = load_config(args.config, seed=args.seed)
@@ -77,8 +94,14 @@ def main():
     callback, wandb_run = None, None
     if args.wandb_project is not None:
         import wandb  # only needed when logging to wandb
-        wandb_run = wandb.init(project=args.wandb_project, group=args.wandb_group, name=name,
-                               config=asdict(config))
+        # <code>__<config>: the two sides of a comparison share the part
+        # after "__" (theirs come from scripts/upload_*_logs.py).
+        group = args.wandb_group or f"ours__{path.stem}"
+        fields = {"code": "ours", "config_file": str(path), "method": config.method.name,
+                  "git_commit": git_commit()}
+        wandb_run = wandb.init(project=args.wandb_project, group=group,
+                               name=f"{group}__seed{config.seed}",
+                               config={**asdict(config), **fields})
 
         names, step_column = WANDB[config.loop.name]
 

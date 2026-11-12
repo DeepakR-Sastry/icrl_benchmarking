@@ -1,14 +1,16 @@
 #!/bin/bash
-# Our ICL (Gaurav et al.) on HalfCheetah-Constrained, one config named by the
-# first argument: configs/hc/<name>.yaml, wandb group ours_<name>, run folders
-# runs/hc_<name>_seed<k>/. Written for the bug-off runs (docs/decisions.md
-# 2026-11-10): icl_ray_no7, icl_ray_no8, icl_ray_no9, icl_ray_fixed,
-# icl_fixed. Otherwise the same as ours_icl_ray.sh (seeds 1-20, 1 CPU, 6G,
-# 8 h, compute[1-2] excluded: see that file for why).
+# Our code on HalfCheetah, one config named by the first argument:
+# configs/hc/<name>.yaml, wandb group ours__<name> (run_icrl.py's rule), run folders
+# runs/hc_<name>_seed<k>/, seeds 1-20 (array). Any loop (ICRL, GACL, ICL):
+# scripts/run_icrl.py picks it from the config. Written for the ICL bug-off
+# runs as ours_icl_variant.sh, renamed 2026-11-12 for every config-by-name
+# job (docs/decisions.md). 1 CPU, 6G, 8 h, compute[1-2] excluded (slow:
+# ~4x on compute2; docs/decisions.md 2026-11-09). Change the seeds at
+# submission with --array (e.g. --array=0-19).
 # Submit from ~/scratch/icrl_benchmarking, one job per config (#SBATCH lines
 # can't read $1, so the job name is given here):
 #   mkdir -p logs
-#   sbatch --job-name=icl_ray_no7 scripts/cluster/ours_icl_variant.sh icl_ray_no7
+#   sbatch --job-name=<name> scripts/cluster/ours_variant.sh <name>
 #SBATCH --account=aip-s2ganapa
 #SBATCH --array=1-20
 #SBATCH --cpus-per-task=1
@@ -36,4 +38,4 @@ export WANDB_MODE=offline WANDB_SILENT=true OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
 
 python scripts/run_icrl.py --config configs/hc/$NAME.yaml \
     --seed $SLURM_ARRAY_TASK_ID \
-    --wandb-project icrl-hc-icrl --wandb-group ours_$NAME
+    --wandb-project icrl-hc-icrl
