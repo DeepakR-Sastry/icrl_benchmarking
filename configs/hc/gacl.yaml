@@ -11,7 +11,7 @@ true_cost: {name: half_cheetah_with_pos}
 # Unclipped: his discriminator neither clips observations nor actions
 # (docs/decisions.md, 2026-11-01).
 featurizer: {name: half_cheetah_with_pos_raw}
-expert: expert_data/hc_malik.pkl            # -er 10 -ep; made by scripts/make_hc_malik_expert.py
+expert: expert_data/hc_malik.pkl            # -er 10 -ep; made by scripts/make_malik_expert.py --env hc
 n_envs: 5                                   # -nt default 5
 agent:
   name: ppo

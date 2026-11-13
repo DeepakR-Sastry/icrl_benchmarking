@@ -1,13 +1,19 @@
 """Upload Gaurav's ICL runs to wandb from their console logs, to chart them
-next to ours (group ours_icl). His icl.py logs to tensorboard and prints
-one dict per logging call ('key': value) to stdout; on Vulcan that is the
-Slurm log (~/refs/cluster/gaurav_icl.sh).
+next to ours. His icl.py logs to tensorboard and prints one dict per
+logging call ('key': value) to stdout; on Vulcan that is the Slurm log
+(~/refs/cluster/gaurav_icl.sh).
 
     python scripts/upload_gaurav_logs.py logs/gaurav_icl_2221352_*.out \
-        --project icrl-hc-icrl --group gaurav_icl
+        --project icrl-hc-icrl --config hc/icl_ray [--patch gaurav_ant.patch]
 
-One wandb run per log, named <group>_seed<k> (k from his "Seed=k" line),
-one point per round under OUR names (scripts/run_icrl.py logs ours with
+--config names OUR config for the same setup as <folder>/<name>
+(configs/<folder>/<name>.yaml); its method is recorded. Group
+gaurav__<folder>_<name>, one run per log, gaurav__<folder>_<name>__seed<k>
+(k from his "Seed=k" line), as our run_icrl.py names ours
+ours__<folder>_<name> (docs/decisions.md 2026-11-12). Fields: code gaurav,
+config_file, method, git_commit (his commit, + "+<patch>" when --patch
+names the patch his code ran with, e.g. Ant's), source_log. Runs uploaded
+before 2026-11-12 keep the old group gaurav_icl. One point per round under OUR names (scripts/run_icrl.py logs ours with
 our names, step = round): rounds 0..n-1, then his final no-mix round as
 step n, as our final row. Only finished logs (with the final NAD) are
 uploaded.
@@ -28,6 +34,10 @@ prints as sets ({old, new}: Penalty, LossPi, ...).
 import argparse
 import re
 from pathlib import Path
+
+import yaml
+
+HIS_COMMIT = "096e422"  # ~/refs/gaurav_icl, the clone his runs use (Vulcan too)
 
 EPOCHS_PER_ROUND = 50    # his hc.json ppo_epochs
 EPOCHS_IN_OUR_WINDOW = 25  # 25 epochs x 4000 steps = 100 episodes of 1000
@@ -84,9 +94,18 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("logs", nargs="+")
     parser.add_argument("--project", required=True)
-    parser.add_argument("--group", required=True)
+    parser.add_argument("--config", required=True,
+                        help="our config for this setup as <folder>/<name>, e.g. hc/icl_ray")
+    parser.add_argument("--patch", help="patch his code ran with, e.g. gaurav_ant.patch")
     parser.add_argument("--entity", default="irl-chip")
     args = parser.parse_args()
+
+    config_file = Path("configs") / f"{args.config}.yaml"
+    if config_file.parent == Path("configs"):
+        parser.error("--config needs a folder: <folder>/<name>, e.g. hc/icl_ray")
+    method = yaml.safe_load(config_file.read_text())["method"]["name"]  # refuses a missing file
+    group = f"gaurav__{config_file.parent.name}_{config_file.stem}"
+    commit = HIS_COMMIT + (f"+{args.patch}" if args.patch else "")
 
     import wandb
 
@@ -96,8 +115,10 @@ def main():
             print(f"{path.name}: seed {seed}, unfinished (no final NAD), skipped")
             continue
         run = wandb.init(entity=args.entity, project=args.project,
-                         group=args.group, name=f"{args.group}_seed{seed}",
-                         config={"seed": seed, "source_log": path.name})
+                         group=group, name=f"{group}__seed{seed}",
+                         config={"seed": seed, "source_log": path.name, "code": "gaurav",
+                                 "config_file": str(config_file), "method": method,
+                                 "git_commit": commit})
         for row in rows:
             run.log(row, step=row["round"])
         run.finish()

@@ -11,7 +11,7 @@
 # docs/decisions.md 2026-11-09. 6G: his run peaked at 4.3 GB; ours was not measured.
 # Setup (venv + POT, clone, expert pile): docs/decisions.md, 2026-10-28 and
 # 2026-11-09; the pile expert_data/hc_gaurav.pkl is made with
-# scripts/make_hc_gaurav_expert.py and copied over with scp.
+# scripts/make_gaurav_expert.py --env hc and copied over with scp.
 # Submit from ~/scratch/icrl_benchmarking:
 #   mkdir -p logs && sbatch scripts/cluster/ours_icl.sh
 #SBATCH --account=aip-s2ganapa

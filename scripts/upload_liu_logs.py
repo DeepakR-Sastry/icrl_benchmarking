@@ -4,12 +4,13 @@ this path; it prints one table per round (his SB3 logger's text output) to
 stdout.
 
     python scripts/upload_liu_logs.py logs/liu_me_2301234_*.out \
-        --project icrl-hc-icrl --config liu_maximum_entropy
+        --project icrl-hc-icrl --config hc/liu_maximum_entropy
 
---config names OUR config for the same setup (configs/hc/<name>.yaml); its
-method is recorded. Group liu__<name>, run liu__<name>__seed<k> (k from the
-file name ..._<k>.out, the Slurm array index = his -s seed), as our
-run_icrl.py names ours ours__<name> (docs/decisions.md 2026-11-12). Fields:
+--config names OUR config for the same setup as <folder>/<name>
+(configs/<folder>/<name>.yaml); its method is recorded. Group
+liu__<folder>_<name>, run liu__<folder>_<name>__seed<k> (k from the file
+name ..._<k>.out, the Slurm array index = his -s seed), as our run_icrl.py
+names ours ours__<folder>_<name> (docs/decisions.md 2026-11-12). Fields:
 code liu, config_file, method, git_commit (his commit), source_log,
 his_config (the "config: ..." line his job script prints first). One point
 per round, step = run_iter, as ours (step = round).
@@ -77,13 +78,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("logs", nargs="+")
     parser.add_argument("--project", required=True)
-    parser.add_argument("--config", required=True, help="our config for this setup, configs/hc/<name>.yaml")
+    parser.add_argument("--config", required=True,
+                        help="our config for this setup as <folder>/<name>, e.g. hc/liu_maximum_entropy")
     parser.add_argument("--entity", default="irl-chip")
     args = parser.parse_args()
 
-    config_file = Path("configs/hc") / f"{args.config}.yaml"
+    config_file = Path("configs") / f"{args.config}.yaml"
+    if config_file.parent == Path("configs"):
+        parser.error("--config needs a folder: <folder>/<name>, e.g. hc/liu_maximum_entropy")
     method = yaml.safe_load(config_file.read_text())["method"]["name"]  # refuses a missing file
-    group = f"liu__{args.config}"
+    group = f"liu__{config_file.parent.name}_{config_file.stem}"
 
     import wandb
 

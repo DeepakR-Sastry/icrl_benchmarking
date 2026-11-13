@@ -9,7 +9,8 @@ Run from the repo root (paths inside configs are relative to it):
                            share file names, so the folder keeps runs apart)
       [--wandb-project P]  also log every row to wandb, under the names
                            Malik's code logs them
-      [--wandb-group G]    default ours__<config file name>; the run is
+      [--wandb-group G]    default ours__<config folder>_<config file name>
+                           (= the run folder minus _seed<seed>); the run is
                            <group>__seed<seed>, with fields code, config_file,
                            method, git_commit (docs/decisions.md 2026-11-12)"""
 
@@ -94,9 +95,10 @@ def main():
     callback, wandb_run = None, None
     if args.wandb_project is not None:
         import wandb  # only needed when logging to wandb
-        # <code>__<config>: the two sides of a comparison share the part
-        # after "__" (theirs come from scripts/upload_*_logs.py).
-        group = args.wandb_group or f"ours__{path.stem}"
+        # <code>__<folder>_<config>: the two sides of a comparison share the
+        # part after "__" (theirs come from scripts/upload_*_logs.py); the
+        # folder keeps hc/icl_ray and ant/icl_ray apart.
+        group = args.wandb_group or f"ours__{path.parent.name}_{path.stem}"
         fields = {"code": "ours", "config_file": str(path), "method": config.method.name,
                   "git_commit": git_commit()}
         wandb_run = wandb.init(project=args.wandb_project, group=group,

@@ -1,0 +1,48 @@
+# ICL on Ant-Constrained with HIS agent: configs/hc/icl_ray.yaml with only
+# the lines his configs/ant.json changes from configs/hc.json (commit 096e422):
+# the env (AntWall-v0, time_limit 500) and beta (5); plus what follows from
+# the env: true cost, featurizer, his Ant expert pile, metric grid. Bugs (7),
+# (8), (9) on, to match his runs (his Ant code needs a two-line patch to run:
+# docs/methods.md §5). docs/decisions.md 2026-11-12.
+nominal_env: {name: ant_wall}                  # env_id AntWall-v0, time_limit 500 (the env's default)
+eval_env: {name: ant_wall}
+true_cost: {name: ant_wall, wall_x: -1}        # cost_condition s[0] <= -1
+featurizer: {name: ant_wall_x}                 # state_reduction s[:1], i = 1, unclipped
+expert: expert_data/ant_gaurav.pkl             # expert_episodes 100; scripts/make_gaurav_expert.py --env ant
+n_envs: 1                                      # his PPOLag runs one env (1 MPI process)
+agent:
+  name: ppo_lagrangian_ray
+  # Unset = his PPOLag's own defaults (PPOLagrangianRaySettings), which
+  # hc.json leaves unset too: pi_lr 5e-4, pi_iters 80, kl_margin 1.2,
+  # target_kl 0.01, vf_lr 1e-3, vf_iters 80, penalty init 1, penalty lr 0.05.
+  n_steps: 4000                                # steps_per_epoch
+  gamma: 0.99                                  # discount_factor
+  lam: 0.97                                    # gae_lambda
+  clip_ratio: 0.2                              # ppo_clip_param
+  ent_coef: 0.0                                # ppo_entropy_coef
+  budget: 5.0                                  # beta (per episode)
+  lambda_reads_reward: true                    # his bug (8)
+  logp_from_other_draw: true                   # his bug (9)
+method:
+  name: icl
+  hidden: 64                                   # icl.py h=64 (hidden_size 64)
+  learning_rate: 5.0e-4                        # learning_rate
+  discount: 0.99                               # discount_factor
+  beta: 5.0                                    # beta
+  alpha: 15.0                                  # alpha
+  updates_per_epoch: 25                        # updates_per_epoch (inner steps, quirk (b))
+  flow_epochs: 20                              # flow_epochs
+  flow_batch_size: 64                          # minibatch_size
+  normalize_flow_inputs: true                  # normalize_flow_inputs
+loop:
+  name: icl
+  n_rounds: 5                                  # outer_epochs
+  steps_per_round: 200000                      # ppo_epochs 50 x steps_per_epoch 4000
+  snapshot_every: 50                           # mix_save_epoch 50: one snapshot, at the round's end
+  updates_per_round: 25                        # updates_per_epoch (outer count, quirk (b))
+  pi_episodes: 100                             # pi_episodes
+  final_round: true                            # icl.py L95-102
+  agent_data: untrained_policy                 # his PPOLag runs: bug (7) reproduced
+  n_eval_episodes: 10
+metrics_grid: {name: ant_wall}                 # CMSE + NAD on his grid (same as HC's)
+seed: 1                                        # his hc.json seed; -seed overrides

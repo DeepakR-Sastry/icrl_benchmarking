@@ -10,7 +10,7 @@ eval_env: {name: half_cheetah_with_pos}
 true_cost: {name: half_cheetah_with_pos, wall_x: -1}   # cost_condition s[0] <= -1
 featurizer: {name: half_cheetah_with_pos_x}    # state_reduction s[:1], i = 1, unclipped
 # His expert pile (expert-data/data-hc.pt, all 100 episodes), made by
-# scripts/make_hc_gaurav_expert.py.
+# scripts/make_gaurav_expert.py --env hc.
 expert: expert_data/hc_gaurav.pkl              # expert_episodes 100
 n_envs: 1                                      # his PPOLag runs one env (1 MPI process)
 agent:
