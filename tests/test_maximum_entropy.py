@@ -100,3 +100,25 @@ def test_init_seed_fixes_only_the_starting_network():
     assert torch.equal(draw3, torch.rand(3))              # = run seed 3's fresh stream
     w_plain3, _ = build(seed=3, init_seed=None)
     assert not torch.equal(w_plain3[0], w_plain0[0])      # unset: follows the run seed
+
+
+def test_init_weights_replaces_only_the_starting_network(tmp_path):
+    # Malik's bug (3): every run starts from one saved network. Loading it
+    # changes the weights, but not what the run's random stream draws next.
+    def build(**kwargs):
+        method = MaximumEntropy(3, MaximumEntropySettings(hidden_sizes=(8,), seed=5, **kwargs))
+        return method, torch.rand(3)   # the run's stream right after construction
+
+    saved = {"0.weight": np.full((8, 3), 0.25, np.float32), "0.bias": np.zeros(8, np.float32),
+             "2.weight": np.full((1, 8), -0.5, np.float32), "2.bias": np.ones(1, np.float32)}
+    path = tmp_path / "init.npz"
+    np.savez(path, **saved)
+
+    plain, draw_plain = build()
+    loaded, draw_loaded = build(init_weights=str(path))
+    for name, value in loaded.net.state_dict().items():
+        assert np.array_equal(value.numpy(), saved[name])   # exactly the file's weights
+    assert not torch.equal(plain.net[0].weight, loaded.net[0].weight)
+    assert torch.equal(draw_plain, draw_loaded)              # rest of the run unchanged
+    with pytest.raises(ValueError):
+        build(init_weights=str(path), init_seed=0)

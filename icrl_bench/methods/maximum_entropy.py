@@ -33,6 +33,10 @@ class MaximumEntropySettings:
     # Liu's train_icrl.py starts every run from torch seed 0's network, bug
     # (6) (docs/methods.md); set 0 to reproduce it.
     init_seed: int | None = None
+    # .npz file of starting weights (names as the network's state_dict);
+    # None = random. Malik's icrl.py starts every run from one network,
+    # bug (3) (docs/methods.md); set his saved weights to reproduce it.
+    init_weights: str | None = None
     seed: int = 0
     device: str = "cpu"
 
@@ -80,6 +84,13 @@ class MaximumEntropy:
             with torch.random.fork_rng():
                 torch.manual_seed(s.init_seed)
                 self.net = self._build_net(n_features)
+        if s.init_weights is not None:
+            if s.init_seed is not None:
+                raise ValueError("set init_seed or init_weights, not both")
+            # Loaded over the built network, so the build still draws the
+            # same random numbers and the rest of the run is unchanged.
+            saved = np.load(s.init_weights)
+            self.net.load_state_dict({k: torch.as_tensor(saved[k]) for k in saved.files})
         # eps=1e-5 avoids NaNs in Adam (ConstraintNet.__init__).
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=s.learning_rate, eps=1e-5)
         self.n_updates = 0  # the k-th update is ICRL round k
