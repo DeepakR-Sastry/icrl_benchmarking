@@ -5,7 +5,7 @@
 # changed. Local smoke run: ~16 s per 20,480 steps -> ~1.5 h per run on one
 # thread (docs/context.md); 6 h leaves room for a slower node.
 # Setup (venv, clone, expert pile): docs/decisions.md, 2026-10-28; the
-# expert pile expert_data/hc_liu.pkl is made with scripts/make_hc_liu_expert.py.
+# expert pile expert_data/hc_liu.pkl is made with scripts/make_liu_expert.py --env hc.
 # Submit from ~/scratch/icrl_benchmarking:
 #   mkdir -p logs && sbatch scripts/cluster/ours_vicrl.sh
 # Another config and wandb group (e.g. the 60-round runs):

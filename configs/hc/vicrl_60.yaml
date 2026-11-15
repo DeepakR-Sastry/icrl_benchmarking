@@ -20,7 +20,7 @@ true_cost: {name: half_cheetah_with_pos}             # ours x <= -3; his x < -3 
 # (ConstraintNet.prepare_data, clip_obs 20) = this featurizer.
 featurizer: {name: half_cheetah_with_pos}
 # His expert pile, read as his code reads it — bug (5) reproduced on
-# purpose (docs/methods.md); made by scripts/make_hc_liu_expert.py.
+# purpose (docs/methods.md); made by scripts/make_liu_expert.py --env hc.
 expert: expert_data/hc_liu.pkl                       # expert_rollouts: 10
 n_envs: 5                                            # -n 5
 agent:

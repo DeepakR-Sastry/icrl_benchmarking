@@ -79,3 +79,33 @@ def test_init_seed_fixes_only_the_starting_network():
     assert torch.equal(draw3, torch.rand(3))              # = run seed 3's fresh stream
     w_plain3, _ = build(seed=3, init_seed=None)
     assert not torch.equal(w_plain3[0], w_plain0[0])      # unset: follows the run seed
+
+
+def test_kl_stop_only_with_importance_sampling():
+    # Liu's Ant BC (no -nis): the KL between the start-of-update ζ and the
+    # current ζ on the nominal steps is checked before every gradient step.
+    # Before step 1 the network hasn't moved (KL 0), so at least one step is
+    # always taken; with a tiny new→old target the stop fires right after.
+    expert = [np.array([FWD, FWD], dtype=np.float32)]
+    nominal = [np.array([BWD, BWD], dtype=np.float32), np.array([FWD, BWD], dtype=np.float32)]
+
+    def adam_steps(method):
+        return method.optimizer.state[next(method.net.parameters())]["step"]
+
+    tiny = BinaryClassifier(3, BinaryClassifierSettings(learning_rate=0.1, backward_iters=7,
+                                                        importance_sampling=True, target_kl_new_old=1e-9))
+    metrics = tiny.update(expert, nominal)
+    assert adam_steps(tiny) == 1 and metrics["early_stop_itr"] == 1
+    assert metrics["kl_new_old"] > 1e-9
+    assert metrics["is_mean"] == pytest.approx(1.0, abs=1e-4)  # mean 1, but for eps in the sum
+
+    never = BinaryClassifier(3, BinaryClassifierSettings(learning_rate=0.1, backward_iters=7, importance_sampling=True,
+                                                         target_kl_old_new=-1, target_kl_new_old=-1))
+    metrics = never.update(expert, nominal)
+    assert adam_steps(never) == 7 and metrics["early_stop_itr"] == 7
+
+    # Off (the default, Malik's -nis): no stop and no KL metrics, even with
+    # the same tiny target.
+    off = BinaryClassifier(3, BinaryClassifierSettings(learning_rate=0.1, backward_iters=7, target_kl_new_old=1e-9))
+    metrics = off.update(expert, nominal)
+    assert adam_steps(off) == 7 and "kl_new_old" not in metrics
